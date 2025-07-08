@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:async';
-import 'package:signalaudiostream/streamaudio.dart';
+import 'package:fast_audio_stream/streamaudio.dart';
 import 'package:lottie/lottie.dart';
 
 
@@ -51,19 +51,21 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void connectToServer(String ip_address) {
-     channel = WebSocketChannel.connect(Uri.parse("ws://$ip_address:8765"));
-     print('🛰️ Attempted WebSocket connection to: ${channel}');
-     isConnected = true;
+  void connectToServer(String ipAddress) {
+     channel = WebSocketChannel.connect(Uri.parse("ws://$ipAddress:8765"));
+     //print('🛰️ Attempted WebSocket connection to: ${channel}');
+     setState(() {
+       isConnected = true;
+     });
      channel.stream.listen(
            (message) {
-         print('Message from server: $message');
+         //print('Message from server: $message');
        },
        onError: (error) {
-         print('WebSocket error: $error');
+         //print('WebSocket error: $error');
        },
        onDone: () {
-         print('WebSocket closed.');
+         //print('WebSocket closed.');
        },
      );
   }
@@ -73,19 +75,19 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       isConnected = false; // make sure this variable controls your UI state
     });
-    print('Disconnected from WebSocket server');
+    //print('Disconnected from WebSocket server');
   }
 
   Future<void> startStreaming() async {
     session = await startStream(channel);
 
     if (session != null) {
-      print('Audio session started');
+      //print('Audio session started');
       setState(() {
         isRecording = true;
       });
     } else {
-      print('Could not start audio session');
+      //print('Could not start audio session');
     }
   }
 
@@ -97,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       isRecording = false;
     });
-    print('Recording paused and cleaned up');
+    //print('Recording paused and cleaned up');
   }
 
   @override
