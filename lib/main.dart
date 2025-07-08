@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:async';
 import 'package:signalaudiostream/streamaudio.dart';
+import 'package:lottie/lottie.dart';
+
 
 void main() {
   runApp(const SignalStreamApp());
@@ -15,7 +17,7 @@ class SignalStreamApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Signal Stream',
-      theme: ThemeData.dark(),
+      theme: ThemeData.light(),
       home: const HomeScreen(), // <– now wrapped in MaterialApp
     );
   }
@@ -31,6 +33,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late WebSocketChannel channel;
   AudioSession? session;
+  bool isRecording = false;
 
   @override
   void initState(){
@@ -65,6 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (session != null) {
       print('Audio session started');
+      setState(() {
+        isRecording = true;
+      });
     } else {
       print('Could not start audio session');
     }
@@ -75,6 +81,9 @@ class _HomeScreenState extends State<HomeScreen> {
     await session?.recorder.stop();
     await session?.recorder.dispose();
     session = null;
+    setState(() {
+      isRecording = false;
+    });
     print('Recording paused and cleaned up');
   }
 
@@ -96,9 +105,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 size: 100,
                 color: Colors.tealAccent,
               ),
+              if (isRecording)
+                Lottie.asset('assets/animations/record.json', height: 120),
               const SizedBox(height: 40),
               ElevatedButton(
-                onPressed: startStreaming,
+                onPressed: isRecording ? null : startStreaming,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -109,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 20),
               OutlinedButton(
-                onPressed: pauseStreaming,
+                onPressed: isRecording ? pauseStreaming : null,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
                   side: const BorderSide(color: Colors.tealAccent),
