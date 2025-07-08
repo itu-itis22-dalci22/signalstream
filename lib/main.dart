@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:async';
+import 'package:signalaudiostream/streamaudio.dart';
 
 void main() {
   runApp(const SignalStreamApp());
@@ -10,19 +13,70 @@ class SignalStreamApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Signal Stream',
-      theme: ThemeData.dark().copyWith(
-        colorScheme: ColorScheme.dark(primary: Colors.tealAccent),
-        scaffoldBackgroundColor: Colors.grey[800],
-      ),
-      home: const HomeScreen(),
       debugShowCheckedModeBanner: false,
+      title: 'Signal Stream',
+      theme: ThemeData.dark(),
+      home: const HomeScreen(), // <– now wrapped in MaterialApp
     );
   }
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late WebSocketChannel channel;
+  AudioSession? session;
+
+  @override
+  void initState(){
+    super.initState();
+    // WebSocket connection is created here
+    channel = WebSocketChannel.connect(
+      Uri.parse("ws://192.168.31.182:8765"),
+    );
+    print('🛰️ Attempted WebSocket connection to: ${channel}');
+    channel.stream.listen(
+          (message) {
+        print('📥 Message from server: $message');
+      },
+      onError: (error) {
+        print('❌ WebSocket error: $error');
+      },
+      onDone: () {
+        print('🔌 WebSocket closed.');
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    // Always close the WebSocket connection when widget is destroyed
+    channel.sink.close();
+    super.dispose();
+  }
+
+  Future<void> startStreaming() async {
+    session = await startStream(channel);
+
+    if (session != null) {
+      print('Audio session started');
+    } else {
+      print('Could not start audio session');
+    }
+  }
+
+  Future<void> pauseStreaming() async {
+    await session?.subscription.cancel();
+    await session?.recorder.stop();
+    await session?.recorder.dispose();
+    session = null;
+    print('Recording paused and cleaned up');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +98,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 40),
               ElevatedButton(
-                onPressed: () {}, // You’ll implement this
+                onPressed: startStreaming,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -55,7 +109,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               OutlinedButton(
-                onPressed: () {}, // You’ll implement this
+                onPressed: pauseStreaming,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
                   side: const BorderSide(color: Colors.tealAccent),
