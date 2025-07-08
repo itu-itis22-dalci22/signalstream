@@ -31,36 +31,41 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _ipController = TextEditingController();
   late WebSocketChannel channel;
+  bool isConnected = false;
   AudioSession? session;
   bool isRecording = false;
+
+
 
   @override
   void initState(){
     super.initState();
-    // WebSocket connection is created here
-    channel = WebSocketChannel.connect(
-      Uri.parse("ws://192.168.31.182:8765"),
-    );
-    print('🛰️ Attempted WebSocket connection to: ${channel}');
-    channel.stream.listen(
-          (message) {
-        print('📥 Message from server: $message');
-      },
-      onError: (error) {
-        print('❌ WebSocket error: $error');
-      },
-      onDone: () {
-        print('🔌 WebSocket closed.');
-      },
-    );
   }
 
   @override
   void dispose() {
     // Always close the WebSocket connection when widget is destroyed
     channel.sink.close();
+    _ipController.dispose();
     super.dispose();
+  }
+
+  void connectToServer(String ip_address) {
+     channel = WebSocketChannel.connect(Uri.parse("ws://$ip_address:8765"));
+     print('🛰️ Attempted WebSocket connection to: ${channel}');
+     channel.stream.listen(
+           (message) {
+         print('Message from server: $message');
+       },
+       onError: (error) {
+         print('WebSocket error: $error');
+       },
+       onDone: () {
+         print('WebSocket closed.');
+       },
+     );
   }
 
   Future<void> startStreaming() async {
@@ -94,43 +99,65 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Signal Stream'),
         centerTitle: true,
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.graphic_eq,
-                size: 100,
-                color: Colors.tealAccent,
-              ),
-              if (isRecording)
-                Lottie.asset('assets/animations/record.json', height: 120),
-              const SizedBox(height: 40),
-              ElevatedButton(
-                onPressed: isRecording ? null : startStreaming,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 20.0),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.graphic_eq,
+                  size: 100,
+                  color: Colors.tealAccent,
+                ),
+                if (isRecording)
+                  Lottie.asset('assets/animations/record.json', height: 120),
+                const SizedBox(height: 40),
+                TextField(
+                  controller: _ipController,
+                  decoration: const InputDecoration(
+                    labelText: 'Server IP Address',
+                    border: OutlineInputBorder(),
                   ),
                 ),
-                child: const Text('Start Stream'),
-              ),
-              const SizedBox(height: 20),
-              OutlinedButton(
-                onPressed: isRecording ? pauseStreaming : null,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
-                  side: const BorderSide(color: Colors.tealAccent),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: isConnected
+                      ? null
+                      : () {
+                    final ip = _ipController.text.trim();
+                    connectToServer(ip);
+                  },
+                  child: const Text('Connect to Server'),
                 ),
-                child: const Text('Pause'),
-              ),
-            ],
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: isRecording ? null : startStreaming,
+                  style: ElevatedButton.styleFrom(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Start Stream'),
+                ),
+                const SizedBox(height: 20),
+                OutlinedButton(
+                  onPressed: isRecording ? pauseStreaming : null,
+                  style: OutlinedButton.styleFrom(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
+                    side: const BorderSide(color: Colors.tealAccent),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Pause'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
