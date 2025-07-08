@@ -38,7 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isRecording = false;
 
 
-
   @override
   void initState(){
     super.initState();
@@ -55,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void connectToServer(String ip_address) {
      channel = WebSocketChannel.connect(Uri.parse("ws://$ip_address:8765"));
      print('🛰️ Attempted WebSocket connection to: ${channel}');
+     isConnected = true;
      channel.stream.listen(
            (message) {
          print('Message from server: $message');
@@ -66,6 +66,14 @@ class _HomeScreenState extends State<HomeScreen> {
          print('WebSocket closed.');
        },
      );
+  }
+
+  void disconnectFromServer() {
+    channel.sink.close(); // closes the WebSocket connection
+    setState(() {
+      isConnected = false; // make sure this variable controls your UI state
+    });
+    print('Disconnected from WebSocket server');
   }
 
   Future<void> startStreaming() async {
@@ -155,6 +163,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   child: const Text('Pause'),
+                ),
+                const SizedBox(height: 20),
+                OutlinedButton(
+                  onPressed: isConnected ? disconnectFromServer : null,
+                  style: OutlinedButton.styleFrom(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
+                    side: const BorderSide(color: Colors.tealAccent),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Disconnect from Server'),
                 ),
               ],
             ),
