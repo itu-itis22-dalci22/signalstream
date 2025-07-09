@@ -143,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: _ipController.text.trim().isEmpty
+                  onPressed: (isConnected || _ipController.text.trim().isEmpty)
                       ? null
                       : () {
                     final ip = _ipController.text.trim();
