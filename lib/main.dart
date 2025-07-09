@@ -31,7 +31,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final TextEditingController _ipController = TextEditingController();
+  final TextEditingController _ipController = TextEditingController(text: '192.168.31.182');
+  final TextEditingController _idController = TextEditingController();
+
   late WebSocketChannel channel;
   bool isConnected = false;
   AudioSession? session;
@@ -53,19 +55,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void connectToServer(String ipAddress) {
      channel = WebSocketChannel.connect(Uri.parse("ws://$ipAddress:8765"));
-     //print('🛰️ Attempted WebSocket connection to: ${channel}');
+     print('🛰️ Attempted WebSocket connection to: ${channel}');
      setState(() {
        isConnected = true;
      });
      channel.stream.listen(
            (message) {
-         //print('Message from server: $message');
+         print('Message from server: $message');
        },
        onError: (error) {
-         //print('WebSocket error: $error');
+         print('WebSocket error: $error');
        },
        onDone: () {
-         //print('WebSocket closed.');
+         print('WebSocket closed.');
        },
      );
   }
@@ -75,19 +77,19 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       isConnected = false; // make sure this variable controls your UI state
     });
-    //print('Disconnected from WebSocket server');
+    print('Disconnected from WebSocket server');
   }
 
-  Future<void> startStreaming() async {
-    session = await startStream(channel);
+  Future<void> startStreaming(WebSocketChannel channel, String deviceID) async {
+    session = await startStream(channel, deviceID);
 
     if (session != null) {
-      //print('Audio session started');
+      print('Audio session started');
       setState(() {
         isRecording = true;
       });
     } else {
-      //print('Could not start audio session');
+      print('Could not start audio session');
     }
   }
 
@@ -99,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       isRecording = false;
     });
-    //print('Recording paused and cleaned up');
+    print('Recording paused and cleaned up');
   }
 
   @override
@@ -125,6 +127,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   Lottie.asset('assets/animations/record.json', height: 120),
                 const SizedBox(height: 40),
                 TextField(
+                  controller: _idController,
+                  decoration: const InputDecoration(
+                    labelText: 'Device ID',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 20,),
+                TextField(
                   controller: _ipController,
                   decoration: const InputDecoration(
                     labelText: 'Server IP Address',
@@ -133,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: isConnected
+                  onPressed: _ipController.text.trim().isEmpty
                       ? null
                       : () {
                     final ip = _ipController.text.trim();
@@ -143,7 +153,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: isRecording ? null : startStreaming,
+                  onPressed: (isRecording || !isConnected)
+                      ? null
+                      : () {
+                    final deviceID = (_idController.text.trim().isNotEmpty)
+                        ? _idController.text.trim()
+                        : "device-${DateTime.now().millisecondsSinceEpoch}";
+                    startStreaming(channel, deviceID);
+                    },
                   style: ElevatedButton.styleFrom(
                     padding:
                     const EdgeInsets.symmetric(horizontal: 50, vertical: 16),

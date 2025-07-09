@@ -2,6 +2,8 @@ import 'package:record/record.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:typed_data';
 import 'dart:async';
+import 'dart:convert'; // Needed for jsonEncode and base64Encode
+
 
 class AudioSession {
   final StreamSubscription<Uint8List> subscription;
@@ -10,7 +12,7 @@ class AudioSession {
   AudioSession({ required this.subscription, required this.recorder});
 }
 
-Future<AudioSession?> startStream(WebSocketChannel channel) async{
+Future<AudioSession?> startStream(WebSocketChannel channel, String deviceID) async{
   final recorder = AudioRecorder();
 
   if (await recorder.hasPermission()) {
@@ -24,10 +26,25 @@ Future<AudioSession?> startStream(WebSocketChannel channel) async{
 
     print('🎤 Recording started. Streaming chunks...');
 
-    final subscription = stream.listen((Uint8List data) {
-      print('🔊 Audio chunk: ${data.length} bytes');
-      channel.sink.add(data); // send to WebSocket
-    });
+    final subscription = stream.listen(
+          (Uint8List data) {
+        try {
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final jsonMessage = jsonEncode({
+            'timestamp': timestamp,
+            'device_id': deviceID,
+            'data': base64Encode(data),
+          });
+
+          channel.sink.add(jsonMessage);
+        } catch (e) {
+          print('❌ Failed to encode or send data: $e');
+        }
+      },
+      onError: (error) {
+        print('❌ Audio stream error: $error');
+      },
+    );
 
     return AudioSession(subscription: subscription, recorder: recorder);
   }
