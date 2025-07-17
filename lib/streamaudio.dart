@@ -31,6 +31,7 @@ Future<AudioSession?> startStream(WebSocketChannel channel, String deviceID) asy
         try {
           final timestamp = DateTime.now().millisecondsSinceEpoch;
           final jsonMessage = jsonEncode({
+            'msg_type': 'audio_stream',
             'timestamp': timestamp,
             'device_id': deviceID,
             'data': base64Encode(data),
