@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:async';
-import 'package:fast_audio_stream/streamaudio.dart';
+import 'package:fast_audio_stream/stream-audio.dart';
 import 'package:lottie/lottie.dart';
 import 'dart:convert';
 
@@ -31,7 +31,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final TextEditingController _ipController = TextEditingController(text: '192.168.31.182');
+  final TextEditingController _ipController = TextEditingController(
+    text: '192.168.31.182',
+  );
   final TextEditingController _idController = TextEditingController();
 
   late WebSocketChannel channel;
@@ -44,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _heartbeatTimeout;
 
   @override
-  void initState(){
+  void initState() {
     super.initState();
   }
 
@@ -64,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final heartbeat = {
         "msg_type": "heartbeat",
         "device_id": deviceID,
-        "timestamp": DateTime.now().millisecondsSinceEpoch
+        "timestamp": DateTime.now().millisecondsSinceEpoch,
       };
       try {
         channel.sink.add(jsonEncode(heartbeat));
@@ -88,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-            )
+            ),
           ],
         );
       },
@@ -113,14 +115,16 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text("Connection Failed"),
-          content: const Text("Server did not respond. Please check the IP and try again."),
+          content: const Text(
+            "Server did not respond. Please check the IP and try again.",
+          ),
           actions: [
             TextButton(
               child: const Text("OK"),
               onPressed: () {
                 Navigator.of(context).pop();
               },
-            )
+            ),
           ],
         );
       },
@@ -143,6 +147,95 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _listenToWebSocket() {
+    // Temporary state: pending connection
+    bool confirmed = false;
+
+    channel.stream.listen(
+      (message) {
+        print('✅ Message from server: $message');
+
+        try {
+          final decoded = jsonDecode(message);
+          final msgType = decoded['msg_type'];
+          final ackDeviceId = decoded['device_id'];
+
+          // Handle connection ACK
+          if (msgType == 'connection_ack' &&
+              ackDeviceId == _idController.text.trim()) {
+            if (!confirmed) {
+              setState(() {
+                isConnected = true;
+                isConnecting = false;
+              });
+              confirmed = true;
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("✅ Connected to server"),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+
+              _startHeartbeat(_idController.text.trim());
+            }
+          }
+
+          // Handle heartbeat ACK
+          if (msgType == 'heartbeat_ack' &&
+              ackDeviceId == _idController.text.trim()) {
+            _handleHeartbeatAck(); // reset the 3s watchdog
+          }
+
+          if (msgType == 'start_stream' && ackDeviceId == _idController.text.trim()) {
+            if (!isRecording && isConnected) {
+              final deviceID = (_idController.text.trim().isNotEmpty)
+                  ? _idController.text.trim()
+                  : "device-${DateTime.now().millisecondsSinceEpoch}";
+              startStreaming(channel, deviceID);
+            }
+          }
+
+          if (msgType == 'end_stream' && ackDeviceId == _idController.text.trim()) {
+            if (isRecording) {
+              pauseStreaming();
+              final connectionRequest = {
+                "msg_type": "stream_ended",
+                "device_id": _idController.text.trim(),
+                "timestamp": DateTime.now().millisecondsSinceEpoch,
+              };
+              channel.sink.add(jsonEncode(connectionRequest));
+            }
+          }
+        } catch (e) {
+          print("⚠️ Could not parse server message: $e");
+        }
+      },
+      onError: (error) {
+        print('❌ WebSocket error: $error');
+        _handleDisconnect();
+      },
+      onDone: () {
+        print('❌ WebSocket closed');
+        _handleDisconnect();
+      },
+    );
+
+    // Optional: Add connection timeout safeguard
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!confirmed) {
+        print("❌ Connection timeout — server didn't respond.");
+        _handleDisconnect();
+        _showServerTimeoutDialog();
+        setState(() {
+          isConnecting = false;
+        });
+      }
+    });
+  }
+
   void connectToServer(String ipAddress) {
     try {
       final wsUri = Uri.parse("ws://$ipAddress:8765/ws/stream");
@@ -152,78 +245,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final connectionRequest = {
         "msg_type": "connection_request",
         "device_id": _idController.text.trim(),
-        "timestamp": DateTime.now().millisecondsSinceEpoch
+        "timestamp": DateTime.now().millisecondsSinceEpoch,
       };
       channel.sink.add(jsonEncode(connectionRequest));
 
-      // Temporary state: pending connection
-      bool confirmed = false;
-
-      channel.stream.listen(
-            (message) {
-          print('✅ Message from server: $message');
-
-          try {
-            final decoded = jsonDecode(message);
-            final msgType = decoded['msg_type'];
-            final ackDeviceId = decoded['device_id'];
-
-            // Handle connection ACK
-            if (msgType == 'connection_ack' &&
-                ackDeviceId == _idController.text.trim()) {
-              if (!confirmed) {
-                setState(() {
-                  isConnected = true;
-                  isConnecting = false;
-                });
-                confirmed = true;
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("✅ Connected to server"),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
-
-                _startHeartbeat(_idController.text.trim());
-              }
-            }
-
-            // Handle heartbeat ACK
-            if (msgType == 'heartbeat_ack' &&
-                ackDeviceId == _idController.text.trim()) {
-                _handleHeartbeatAck(); // reset the 3s watchdog
-            }
-
-          } catch (e) {
-            print("⚠️ Could not parse server message: $e");
-          }
-        },
-        onError: (error) {
-          print('❌ WebSocket error: $error');
-          _handleDisconnect();
-        },
-        onDone: () {
-          print('❌ WebSocket closed');
-          _handleDisconnect();
-        },
-      );
-
-      // Optional: Add connection timeout safeguard
-      Future.delayed(const Duration(seconds: 3), () {
-        if (!confirmed) {
-          print("❌ Connection timeout — server didn't respond.");
-          _handleDisconnect();
-          _showServerTimeoutDialog();
-          setState(() {
-            isConnecting = false;
-          });
-        }
-
-      });
-
+      // Start listening to the WebSocket
+      _listenToWebSocket();
     } catch (e) {
       print("🚫 WebSocket connection failed: $e");
       setState(() {
@@ -259,6 +286,14 @@ class _HomeScreenState extends State<HomeScreen> {
     await session?.recorder.stop();
     await session?.recorder.dispose();
     session = null;
+
+    final connectionRequest = {
+      "msg_type": "stream_ended",
+      "device_id": _idController.text.trim(),
+      "timestamp": DateTime.now().millisecondsSinceEpoch,
+    };
+    channel.sink.add(jsonEncode(connectionRequest));
+
     setState(() {
       isRecording = false;
     });
@@ -268,10 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Signal Stream'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Signal Stream'), centerTitle: true),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 20.0),
@@ -294,7 +326,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     border: OutlineInputBorder(),
                   ),
                 ),
-                const SizedBox(height: 20,),
+                const SizedBox(height: 20),
                 TextField(
                   controller: _ipController,
                   decoration: const InputDecoration(
@@ -304,21 +336,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: (isConnected || isConnecting || _ipController.text.trim().isEmpty)
+                  onPressed:
+                      (isConnected ||
+                          isConnecting ||
+                          _ipController.text.trim().isEmpty)
                       ? null
                       : () {
-                    final ip = _ipController.text.trim();
-                    setState(() {
-                      isConnecting = true;
-                    });
-                    connectToServer(ip);
-                  },
+                          final ip = _ipController.text.trim();
+                          setState(() {
+                            isConnecting = true;
+                          });
+                          connectToServer(ip);
+                        },
                   child: isConnecting
                       ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Text('Connect to Server'),
                 ),
                 const SizedBox(height: 20),
@@ -326,14 +361,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: (isRecording || !isConnected)
                       ? null
                       : () {
-                    final deviceID = (_idController.text.trim().isNotEmpty)
-                        ? _idController.text.trim()
-                        : "device-${DateTime.now().millisecondsSinceEpoch}";
-                    startStreaming(channel, deviceID);
-                    },
+                          final deviceID =
+                              (_idController.text.trim().isNotEmpty)
+                              ? _idController.text.trim()
+                              : "device-${DateTime.now().millisecondsSinceEpoch}";
+                          startStreaming(channel, deviceID);
+                        },
                   style: ElevatedButton.styleFrom(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 50,
+                      vertical: 16,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -344,8 +382,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 OutlinedButton(
                   onPressed: isRecording ? pauseStreaming : null,
                   style: OutlinedButton.styleFrom(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 50,
+                      vertical: 16,
+                    ),
                     side: const BorderSide(color: Colors.tealAccent),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -357,8 +397,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 OutlinedButton(
                   onPressed: isConnected ? disconnectFromServer : null,
                   style: OutlinedButton.styleFrom(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 50,
+                      vertical: 16,
+                    ),
                     side: const BorderSide(color: Colors.tealAccent),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
