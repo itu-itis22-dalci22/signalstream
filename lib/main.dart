@@ -194,7 +194,29 @@ class _HomeScreenState extends State<HomeScreen> {
               final deviceID = (_idController.text.trim().isNotEmpty)
                   ? _idController.text.trim()
                   : "device-${DateTime.now().millisecondsSinceEpoch}";
-              startStreaming(channel, deviceID);
+              
+              // Extract delay from the message
+              final startAfterMs = decoded['start_after_ms'];
+              int delayMs = 0;
+              
+              if (startAfterMs != null) {
+                if (startAfterMs is String) {
+                  delayMs = int.tryParse(startAfterMs) ?? 0;
+                } else if (startAfterMs is int) {
+                  delayMs = startAfterMs;
+                }
+              }
+              
+              if (delayMs > 0) {
+                print("⏰ Starting stream after ${delayMs}ms delay");
+                Timer(Duration(milliseconds: delayMs), () {
+                  if (!isRecording && isConnected) {
+                    startStreaming(channel, deviceID);
+                  }
+                });
+              } else {
+                startStreaming(channel, deviceID);
+              }
             }
           }
 
