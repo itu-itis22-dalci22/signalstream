@@ -189,10 +189,22 @@ class _HomeScreenState extends State<HomeScreen> {
             _handleHeartbeatAck(); // reset the 3s watchdog
           }
 
-          if (msgType == 'start_stream' && ackDeviceId == _idController.text.trim()) {
-            if (!isRecording && isConnected) {
-              final deviceID = (_idController.text.trim().isNotEmpty)
-                  ? _idController.text.trim()
+          if (msgType == 'start_stream') {
+            // Check if current device ID exists in the device list
+            final deviceIds = decoded['device_ids'];
+            final currentDeviceId = _idController.text.trim();
+            bool shouldStartStream = false;
+            
+            if (deviceIds != null && deviceIds is List) {
+              shouldStartStream = deviceIds.contains(currentDeviceId);
+            } else if (ackDeviceId == currentDeviceId) {
+              // Fallback to old behavior if device_ids is not provided
+              shouldStartStream = true;
+            }
+            
+            if (shouldStartStream && !isRecording && isConnected) {
+              final deviceID = (currentDeviceId.isNotEmpty)
+                  ? currentDeviceId
                   : "device-${DateTime.now().millisecondsSinceEpoch}";
               
               // Extract delay from the message
@@ -220,8 +232,20 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           }
 
-          if (msgType == 'end_stream' && ackDeviceId == _idController.text.trim()) {
-            if (isRecording) {
+          if (msgType == 'end_stream') {
+            // Check if current device ID exists in the device list
+            final deviceIds = decoded['device_ids'];
+            final currentDeviceId = _idController.text.trim();
+            bool shouldEndStream = false;
+            
+            if (deviceIds != null && deviceIds is List) {
+              shouldEndStream = deviceIds.contains(currentDeviceId);
+            } else if (ackDeviceId == currentDeviceId) {
+              // Fallback to old behavior if device_ids is not provided
+              shouldEndStream = true;
+            }
+            
+            if (shouldEndStream && isRecording) {
               pauseStreaming();
               final connectionRequest = {
                 "msg_type": "stream_ended",
