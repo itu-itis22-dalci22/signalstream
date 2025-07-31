@@ -6,6 +6,10 @@ A Flutter mobile application that streams real-time audio from mobile devices to
 
 Signal Audio Stream is an MVP (Minimum Viable Product) application designed for real-time audio streaming from Android/iOS devices to a PC server. The app establishes a WebSocket connection with a server and streams audio data in real-time, making it perfect for remote audio monitoring, live streaming, or audio recording applications.
 
+### System Architecture
+
+<img src="images/BigPicture.png" alt="SignalCast Architecture" width="400" height="600"/>
+
 ## ✨ Features
 
 - **Real-time Audio Streaming**: Stream audio from mobile device microphone to PC server
